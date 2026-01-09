@@ -85,12 +85,18 @@ Variables from `.env` are automatically used by Docker Compose.
 
 ```mermaid
 graph TB
+    User[User/Swagger UI]
+    
     subgraph "External Services"
         CalendarAPI[Calendar API<br/>Calendar events]
         PersonAPI[Person API<br/>People data]
     end
     
     subgraph "Spring Boot Application"
+        subgraph "Presentation Layer"
+            EmailCtrl[EmailController<br/>REST API<br/>Technical endpoints]
+        end
+        
         subgraph "Orchestration Layer"
             MorningEmail[MorningEmailService<br/>@Scheduled 8:00 AM<br/>Orchestrator]
         end
@@ -120,6 +126,11 @@ graph TB
         DB[(PostgreSQL<br/>events, attendees,<br/>persons, emails, users)]
         Liquibase[Liquibase<br/>DB Migrations]
     end
+    
+    User -.->|HTTP| EmailCtrl
+    
+    EmailCtrl -->|Get emails| EmailRepo
+    EmailCtrl -->|Generate| MorningEmail
     
     MorningEmail -->|1. Sync| CalendarSync
     MorningEmail -->|2. Enrich| PersonEnrich
@@ -151,6 +162,7 @@ graph TB
     
     Liquibase -.->|Schema| DB
     
+    style EmailCtrl fill:#ffccff
     style MorningEmail fill:#ff9999
     style CalendarSync fill:#99ccff
     style PersonEnrich fill:#99ff99
@@ -161,10 +173,23 @@ graph TB
 
 ### Layer Description
 
+- **Presentation Layer**: REST API controllers for viewing and testing email generation (Swagger/OpenAPI documented)
 - **Orchestration Layer**: Scheduled tasks for automatic email generation
 - **Business Layer**: Business logic for synchronization, enrichment, content generation, and API integration
 - **Data Access Layer**: Database operations via JPA repositories
 - **Integration Layer**: Feign clients for external API integration
+
+### Available API Endpoints
+
+Access via Swagger UI: http://localhost:8080/swagger-ui/index.html
+
+**Email Controller** (`/api/emails`):
+- `GET /api/emails/user/{userId}` - Get all emails for a user
+- `GET /api/emails/user/{userId}/date/{date}` - Get email for specific date
+- `GET /api/emails/user/{userId}/date/{date}/json` - Get email JSON content (scheduler output)
+- `GET /api/emails/user/{userId}/date/{date}/html` - Get email HTML preview
+- `POST /api/emails/user/{userId}/generate` - Manually trigger email generation (testing)
+- `GET /api/emails/latest` - Get 10 latest emails across all users
 
 ## Test Environment Limitations
 
@@ -200,6 +225,8 @@ docker exec -i calendar-enrichment-service-postgres psql -U myuser -d mydatabase
 
 ```
 src/main/java/rs/usergems/calendar/enrichment/
+├── controller/               # REST API controllers
+│   └── EmailController.java
 ├── client/                   # Feign clients for external APIs
 │   ├── CalendarFeignClient.java
 │   └── PersonFeignClient.java

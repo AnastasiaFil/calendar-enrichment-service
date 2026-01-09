@@ -33,8 +33,6 @@ public class CalendarSyncService {
     /**
      * Full synchronization - fetches ALL pages from Calendar API.
      * Used on first user connection (initial load).
-     *
-     * @param userId the user ID
      */
     @Transactional
     public void syncEvents(Long userId) {
@@ -86,14 +84,6 @@ public class CalendarSyncService {
     /**
      * Incremental sync - fetches only events with changed_at > last_sync_at.
      * Optimizes API calls by stopping when reaching already synced events.
-     * <p>
-     * How it works:
-     * 1. Calendar API returns events sorted by changed_at DESC (newest changes first)
-     * 2. We iterate through pages and compare changed_at with last_sync_at
-     * 3. When we encounter event.changed_at < last_sync_at, we stop - all remaining events are already synced
-     * 4. This saves API calls and database operations
-     *
-     * @param userId the user ID
      */
     @Transactional
     public void incrementalSync(Long userId) {
@@ -186,9 +176,6 @@ public class CalendarSyncService {
     /**
      * Returns today's events from local database.
      * Fast SELECT without calling Calendar API.
-     *
-     * @param userId the user ID
-     * @return list of events for today
      */
     public List<EventEntity> getTodayEvents(Long userId) {
         LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
@@ -202,9 +189,6 @@ public class CalendarSyncService {
     /**
      * Upsert (insert or update) event from Calendar API DTO.
      * Handles both new events and updates to existing events.
-     *
-     * @param userId the user ID
-     * @param dto    the event DTO from Calendar API
      */
     @Transactional
     public void upsertEvent(Long userId, CalendarEventDto dto) {

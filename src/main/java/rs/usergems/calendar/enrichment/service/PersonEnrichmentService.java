@@ -14,12 +14,6 @@ import java.util.Optional;
 
 /**
  * Service for enriching person data with 30-day caching logic.
- * 
- * Uses lazy refresh strategy:
- * - Check cache first
- * - If cache is fresh (< 30 days), return cached data
- * - If cache is stale or missing, fetch from Person API
- * - On API failure, return stale cache if available
  */
 @Slf4j
 @Service
@@ -36,9 +30,6 @@ public class PersonEnrichmentService {
     /**
      * Main method to get enriched person data.
      * Implements caching with 30-day TTL and lazy refresh.
-     *
-     * @param email person's email address
-     * @return enriched person data or null for internal users
      */
     public PersonEntity enrichPerson(String email) {
         if (email == null || email.isBlank()) {
@@ -95,8 +86,7 @@ public class PersonEnrichmentService {
     }
 
     /**
-     * Check if cached person data should be refreshed
-     * Returns true if data is older than 30 days
+     * Check if cached person data should be refreshed (older than 30 days)
      */
     private boolean shouldRefresh(PersonEntity person) {
         if (person.getFetchedAt() == null) {
@@ -133,7 +123,6 @@ public class PersonEnrichmentService {
         entity.setTitle(dto.getTitle());
         entity.setLinkedinUrl(dto.getLinkedinUrl());
         
-        // Map company data if available
         if (dto.getCompany() != null) {
             entity.setCompanyName(dto.getCompany().getName());
             entity.setCompanyLinkedin(dto.getCompany().getLinkedinUrl());

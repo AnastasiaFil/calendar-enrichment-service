@@ -21,9 +21,6 @@ public class CalendarApiService {
 
     /**
      * Fetches all calendar events for a user with pagination handling
-     *
-     * @param userEmail the user's email
-     * @return list of all calendar events across all pages
      */
     public List<CalendarEventDto> fetchAllEvents(String userEmail) {
         List<CalendarEventDto> allEvents = new ArrayList<>();
@@ -53,10 +50,6 @@ public class CalendarApiService {
 
     /**
      * Fetches a single page of calendar events
-     *
-     * @param userEmail the user's email
-     * @param page      the page number (1-based)
-     * @return calendar API response for the specified page
      */
     public CalendarApiResponse fetchEventsPage(String userEmail, int page) {
         String apiKey = properties.getApiKeyForEmail(userEmail);
@@ -77,10 +70,6 @@ public class CalendarApiService {
 
     /**
      * Fetches only events that changed after a specific timestamp
-     *
-     * @param userEmail    the user's email
-     * @param changedAfter ISO timestamp to filter events
-     * @return list of events changed after the specified time
      */
     public List<CalendarEventDto> fetchChangedEvents(String userEmail, String changedAfter) {
         List<CalendarEventDto> allEvents = fetchAllEvents(userEmail);

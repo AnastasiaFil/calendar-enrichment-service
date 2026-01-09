@@ -41,10 +41,6 @@ public class EmailBuilderService {
 
     /**
      * Builds JSON email content with enriched meeting data
-     *
-     * @param userId user ID for whom to build email
-     * @param events list of events to include in email
-     * @return structured JSON email content
      */
     @Transactional(readOnly = true)
     public EmailContentJson buildJson(Long userId, List<EventEntity> events) {
@@ -119,10 +115,7 @@ public class EmailBuilderService {
     }
 
     /**
-     * Renders HTML from email JSON content (bonus feature)
-     *
-     * @param emailJson structured email content
-     * @return HTML string
+     * Renders HTML from email JSON content
      */
     public String buildHtml(EmailContentJson emailJson) {
         StringBuilder html = new StringBuilder();
@@ -239,10 +232,6 @@ public class EmailBuilderService {
 
     /**
      * Counts meeting history between user and contact
-     *
-     * @param userEmail    user's email
-     * @param contactEmail contact's email
-     * @return meeting history with total count and colleague counts
      */
     @Transactional(readOnly = true)
     public MeetingHistory countMeetingHistory(String userEmail, String contactEmail) {

@@ -18,14 +18,6 @@ import java.util.List;
 
 /**
  * Morning Email Orchestrator Service
- * 
- * Coordinates the entire flow of generating morning emails for all users:
- * 1. Syncs calendar data (incremental)
- * 2. Fetches today's events
- * 3. Enriches external attendees with Person API (only accepted, not declined)
- * 4. Builds email content (JSON and HTML)
- * 5. Saves email to database
- * 
  * Scheduled to run every day at 8:00 AM
  */
 @Slf4j
@@ -73,16 +65,6 @@ public class MorningEmailService {
 
     /**
      * Generates morning email for a single user
-     * 
-     * Flow:
-     * 1. Incremental calendar sync
-     * 2. Get today's events
-     * 3. Enrich external accepted attendees with Person API (skip declined)
-     * 4. Build email JSON and HTML
-     * 5. Save to database
-     * 
-     * @param userId user ID
-     * @return true if email was generated, false if no events today
      */
     public boolean generateEmailForUser(Long userId) {
         UserEntity user = userRepository.findById(userId)
@@ -135,14 +117,6 @@ public class MorningEmailService {
 
     /**
      * Enriches external attendees with Person API data
-     * 
-     * Rules:
-     * - Skip internal users (@usergems.com)
-     * - Skip declined attendees (use stale data from DB)
-     * - Only enrich accepted/tentative attendees
-     * 
-     * @param events list of events
-     * @param userEmail current user's email (to exclude from enrichment)
      */
     private void enrichAttendees(List<EventEntity> events, String userEmail) {
         int enrichedCount = 0;
