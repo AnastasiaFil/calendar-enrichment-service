@@ -184,49 +184,6 @@ public class CalendarSyncService {
     }
 
     /**
-     * Synchronizes calendar events for a user
-     *
-     * @param userId the user ID
-     * @deprecated Use syncEvents() for initial sync or incrementalSync() for updates
-     */
-    @Deprecated
-    @Transactional
-    public void syncUserEvents(Long userId) {
-        Optional<UserEntity> userOpt = userRepository.findById(userId);
-        if (userOpt.isEmpty()) {
-            log.warn("User not found: {}", userId);
-            return;
-        }
-
-        UserEntity user = userOpt.get();
-        log.info("Starting calendar sync for user: {}", user.getEmail());
-
-        List<CalendarEventDto> events;
-
-        // If user has been synced before, fetch only changed events
-        if (user.getLastSyncAt() != null) {
-            String lastSyncTimestamp = user.getLastSyncAt().format(DATE_TIME_FORMATTER);
-            events = calendarApiClient.fetchChangedEvents(user.getEmail(), lastSyncTimestamp);
-            log.info("Fetched {} changed events since {}", events.size(), lastSyncTimestamp);
-        } else {
-            // First sync - fetch all events
-            events = calendarApiClient.fetchAllEvents(user.getEmail());
-            log.info("Fetched {} total events (first sync)", events.size());
-        }
-
-        // Process and save events
-        for (CalendarEventDto eventDto : events) {
-            saveOrUpdateEvent(user, eventDto);
-        }
-
-        // Update last sync time
-        user.setLastSyncAt(LocalDateTime.now());
-        userRepository.save(user);
-
-        log.info("Calendar sync completed for user: {}", user.getEmail());
-    }
-
-    /**
      * Returns today's events from local database.
      * Fast SELECT without calling Calendar API.
      *
@@ -280,37 +237,6 @@ public class CalendarSyncService {
 
         // Update attendees
         updateEventAttendees(event, dto);
-    }
-
-    /**
-     * Saves or updates an event from the API
-     */
-    private void saveOrUpdateEvent(UserEntity user, CalendarEventDto eventDto) {
-        Optional<EventEntity> existingEventOpt = eventRepository.findById(eventDto.getId());
-
-        EventEntity event;
-        if (existingEventOpt.isPresent()) {
-            event = existingEventOpt.get();
-            log.debug("Updating existing event: {}", eventDto.getId());
-        } else {
-            event = new EventEntity();
-            event.setUser(user);
-            event.setExternalId(eventDto.getId());
-            log.debug("Creating new event: {}", eventDto.getId());
-        }
-
-        // Update event fields
-        event.setTitle(eventDto.getTitle());
-        event.setStartAt(parseDateTime(eventDto.getStart()));
-        event.setEndAt(parseDateTime(eventDto.getEnd()));
-        event.setChangedAt(parseDateTime(eventDto.getChanged()));
-        event.setSyncedAt(LocalDateTime.now());
-        event.setDeleted(false);
-
-        event = eventRepository.save(event);
-
-        // Update attendees
-        updateEventAttendees(event, eventDto);
     }
 
     /**
