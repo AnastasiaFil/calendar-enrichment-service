@@ -1,0 +1,40 @@
+databaseChangeLog:
+  - changeSet:
+      id: 3-create-table-event-attendees
+      author: filisova
+      changes:
+        - createTable:
+            tableName: event_attendees
+            columns:
+              - column:
+                  name: id
+                  type: BIGSERIAL
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: event_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+
+        - addForeignKeyConstraint:
+            baseTableName: event_attendees
+            baseColumnNames: event_id
+            constraintName: fk_event_attendees_event_id
+            referencedTableName: events
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - addUniqueConstraint:
+            tableName: event_attendees
+            columnNames: event_id, email
+            constraintName: uk_event_attendees_event_email

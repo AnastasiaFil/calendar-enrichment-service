@@ -1,0 +1,55 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2-create-table-events
+      author: filisova
+      changes:
+        - createTable:
+            tableName: events
+            columns:
+              - column:
+                  name: id
+                  type: BIGSERIAL
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: external_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: VARCHAR(500)
+              - column:
+                  name: start_at
+                  type: TIMESTAMP
+              - column:
+                  name: end_at
+                  type: TIMESTAMP
+              - column:
+                  name: changed_at
+                  type: TIMESTAMP
+              - column:
+                  name: synced_at
+                  type: TIMESTAMP
+              - column:
+                  name: deleted
+                  type: BOOLEAN
+
+        - addForeignKeyConstraint:
+            baseTableName: events
+            baseColumnNames: user_id
+            constraintName: fk_events_user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - addUniqueConstraint:
+            tableName: events
+            columnNames: user_id, external_id
+            constraintName: uk_events_user_external

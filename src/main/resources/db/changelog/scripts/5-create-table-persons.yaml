@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: 5-create-table-persons
+      author: filisova
+      changes:
+        - createTable:
+            tableName: persons
+            columns:
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: first_name
+                  type: VARCHAR(100)
+              - column:
+                  name: last_name
+                  type: VARCHAR(100)
+              - column:
+                  name: avatar_url
+                  type: VARCHAR(500)
+              - column:
+                  name: title
+                  type: VARCHAR(255)
+              - column:
+                  name: linkedin_url
+                  type: VARCHAR(500)
+              - column:
+                  name: company_name
+                  type: VARCHAR(255)
+              - column:
+                  name: company_linkedin
+                  type: VARCHAR(500)
+              - column:
+                  name: company_employees
+                  type: INTEGER
+              - column:
+                  name: fetched_at
+                  type: TIMESTAMP

@@ -1,0 +1,32 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1-create-table-users
+      author: filisova
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  type: BIGSERIAL
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: calendar_token
+                  type: VARCHAR(255)
+              - column:
+                  name: timezone
+                  type: VARCHAR(50)
+              - column:
+                  name: last_sync_at
+                  type: TIMESTAMP
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
