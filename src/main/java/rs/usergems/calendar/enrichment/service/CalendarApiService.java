@@ -3,7 +3,7 @@ package rs.usergems.calendar.enrichment.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import rs.usergems.calendar.enrichment.client.calendar.CalendarFeignClient;
+import rs.usergems.calendar.enrichment.client.CalendarFeignClient;
 import rs.usergems.calendar.enrichment.config.CalendarApiProperties;
 import rs.usergems.calendar.enrichment.dto.CalendarApiResponse;
 import rs.usergems.calendar.enrichment.dto.CalendarEventDto;

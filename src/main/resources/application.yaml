@@ -49,6 +49,12 @@ management:
     readinessState:
       enabled: true
 
+feign:
+  client:
+    config:
+      default:
+        logger-level: ${FEIGN_LOGGER_LEVEL:FULL}
+
 calendar:
   api:
     base-url: ${CALENDAR_API_BASE_URL:https://app.usergems.com/api/hiring/calendar-challenge}
@@ -57,13 +63,17 @@ calendar:
       kieran@usergems.com: ${API_KEY_KIERAN:vJy8I3nwriNW*I4w^}
       jas@usergems.com: ${API_KEY_JAS:tK7U8PVeGi3pP9tB^}
       josh@algolia.com: ${API_KEY_JOSH:b8R*41QR21N5wuww^}
-    feign:
-      logger-level: ${FEIGN_LOGGER_LEVEL:FULL}
+
+person:
+  api:
+    base-url: ${PERSON_API_BASE_URL:https://app.usergems.com/api/hiring/calendar-challenge}
+    api-key: ${PERSON_API_KEY:9d^XItOjTAGSG5ch}
 
 logging:
   level:
     root: INFO
     rs.usergems: DEBUG
-    rs.usergems.calendar.enrichment.client.rs.usergems.calendar.enrichment.client.calendar.CalendarFeignClient: DEBUG
+    rs.usergems.calendar.enrichment.client.calendar.rs.usergems.calendar.enrichment.client.CalendarFeignClient: DEBUG
+    rs.usergems.calendar.enrichment.client.person.rs.usergems.calendar.enrichment.client.PersonFeignClient: DEBUG
   pattern:
     console: '%black(%d{ISO8601}) %highlight(%-5level) [%blue(%t)] %yellow(%C{1}): %msg%n%throwable'

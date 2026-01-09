@@ -10,9 +10,9 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @RequiredArgsConstructor
-public class CalendarFeignConfig {
+public class FeignConfiguration {
 
-    @Value("${calendar.api.feign.logger-level:FULL}")
+    @Value("${feign.client.config.default.logger-level:FULL}")
     private String loggerLevel;
 
     @Bean
