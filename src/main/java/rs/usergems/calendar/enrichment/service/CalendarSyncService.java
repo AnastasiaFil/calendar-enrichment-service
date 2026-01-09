@@ -53,10 +53,10 @@ public class CalendarSyncService {
 
         while (hasMore) {
             log.debug("Fetching page {} for user {}", page, user.getEmail());
-            
+
             // Fetch page from Calendar API
             var response = calendarApiClient.fetchEventsPage(user.getEmail(), page);
-            
+
             if (response == null || response.getData() == null) {
                 log.warn("No response or data for page {}", page);
                 hasMore = false;
@@ -79,13 +79,19 @@ public class CalendarSyncService {
         user.setLastSyncAt(LocalDateTime.now());
         userRepository.save(user);
 
-        log.info("FULL sync completed for user: {}. Processed {} events across {} pages", 
+        log.info("FULL sync completed for user: {}. Processed {} events across {} pages",
                 user.getEmail(), totalProcessed, page - 1);
     }
 
     /**
-     * Incremental sync - fetches only events with changed > last_sync_at.
-     * Saves API calls by stopping when reaching already synced events.
+     * Incremental sync - fetches only events with changed_at > last_sync_at.
+     * Optimizes API calls by stopping when reaching already synced events.
+     * <p>
+     * How it works:
+     * 1. Calendar API returns events sorted by changed_at DESC (newest changes first)
+     * 2. We iterate through pages and compare changed_at with last_sync_at
+     * 3. When we encounter event.changed_at < last_sync_at, we stop - all remaining events are already synced
+     * 4. This saves API calls and database operations
      *
      * @param userId the user ID
      */
@@ -111,47 +117,70 @@ public class CalendarSyncService {
         int page = 1;
         boolean hasMore = true;
         int totalProcessed = 0;
+        int totalSkipped = 0;
+        LocalDateTime syncStartTime = LocalDateTime.now();
 
         while (hasMore) {
             log.debug("Fetching page {} for incremental sync, user {}", page, user.getEmail());
-            
+
             var response = calendarApiClient.fetchEventsPage(user.getEmail(), page);
-            
-            if (response == null || response.getData() == null) {
+
+            if (response == null || response.getData() == null || response.getData().isEmpty()) {
+                log.debug("No more data to fetch on page {}", page);
                 hasMore = false;
                 break;
             }
 
             // Process events, stop if we reach already synced data
+            boolean reachedSyncedEvents = false;
             for (CalendarEventDto dto : response.getData()) {
                 LocalDateTime changedAt = parseDateTime(dto.getChanged());
-                
+
+                // Skip events with invalid changed_at
+                if (changedAt == null) {
+                    log.warn("Event {} has null changed_at, skipping", dto.getId());
+                    totalSkipped++;
+                    continue;
+                }
+
                 // Stop if this event was changed before our last sync
-                if (changedAt != null && changedAt.isBefore(lastSync)) {
-                    log.info("Reached already synced events. Stopping at event {} (changed: {})", 
-                            dto.getId(), changedAt);
+                // Since events are sorted by changed_at DESC, all following events are also old
+                if (changedAt.isBefore(lastSync) || changedAt.isEqual(lastSync)) {
+                    log.info("Reached already synced events. Stopping at event {} (changed: {}, last_sync: {})",
+                            dto.getId(), changedAt, lastSync);
+                    reachedSyncedEvents = true;
                     hasMore = false;
                     break;
                 }
-                
+
+                // Process event that was changed after last sync
+                log.debug("Processing event {} changed at {} (after last sync {})",
+                        dto.getId(), changedAt, lastSync);
                 upsertEvent(userId, dto);
                 totalProcessed++;
+            }
+
+            // If we reached synced events, no need to fetch more pages
+            if (reachedSyncedEvents) {
+                break;
             }
 
             // Check if there are more pages
             int totalPages = (int) Math.ceil((double) response.getTotal() / response.getPerPage());
             if (page >= totalPages) {
+                log.debug("Reached last page {}/{}", page, totalPages);
                 hasMore = false;
             }
             page++;
         }
 
-        // Update last sync time
-        user.setLastSyncAt(LocalDateTime.now());
+        // Update last sync time to when we started this sync
+        // This prevents race conditions where events changed during sync
+        user.setLastSyncAt(syncStartTime);
         userRepository.save(user);
 
-        log.info("INCREMENTAL sync completed for user: {}. Processed {} new/updated events", 
-                user.getEmail(), totalProcessed);
+        log.info("INCREMENTAL sync completed for user: {}. Processed: {}, Skipped: {}, Pages fetched: {}",
+                user.getEmail(), totalProcessed, totalSkipped, page - 1);
     }
 
     /**
