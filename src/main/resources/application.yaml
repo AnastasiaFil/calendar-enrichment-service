@@ -1,6 +1,9 @@
 spring:
   application:
     name: calendar-enrichment-service
+  cloud:
+    compatibility-verifier:
+      enabled: false
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydatabase}
     username: ${POSTGRES_USER:myuser}
