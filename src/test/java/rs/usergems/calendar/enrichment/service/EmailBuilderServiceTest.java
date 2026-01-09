@@ -17,6 +17,7 @@ import rs.usergems.calendar.enrichment.repository.PersonRepository;
 import rs.usergems.calendar.enrichment.repository.UserRepository;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
@@ -89,7 +90,6 @@ class EmailBuilderServiceTest {
 
     @Test
     void buildJson_shouldCreateEmailContentWithEnrichedData() {
-        // Given
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(personRepository.findById("demi@algolia.com")).thenReturn(Optional.of(testPerson));
         when(eventRepository.countMeetingsBetween("stephan@usergems.com", "demi@algolia.com")).thenReturn(12);
@@ -99,10 +99,8 @@ class EmailBuilderServiceTest {
                         new rs.usergems.calendar.enrichment.dto.ColleagueMeetingCount("christian@usergems.com", 1)
                 ));
 
-        // When
         EmailContentJson result = emailBuilderService.buildJson(1L, Collections.singletonList(testEvent));
 
-        // Then
         assertNotNull(result);
         assertEquals("stephan@usergems.com", result.getRecipient());
         assertEquals(1, result.getMeetings().size());
@@ -131,7 +129,6 @@ class EmailBuilderServiceTest {
 
     @Test
     void countMeetingHistory_shouldReturnCorrectCounts() {
-        // Given
         when(eventRepository.countMeetingsBetween("stephan@usergems.com", "demi@algolia.com")).thenReturn(12);
         when(eventRepository.findColleagueMeetingCounts("stephan@usergems.com", "demi@algolia.com"))
                 .thenReturn(Arrays.asList(
@@ -139,10 +136,8 @@ class EmailBuilderServiceTest {
                         new rs.usergems.calendar.enrichment.dto.ColleagueMeetingCount("christian@usergems.com", 1)
                 ));
 
-        // When
         MeetingHistory result = emailBuilderService.countMeetingHistory("stephan@usergems.com", "demi@algolia.com");
 
-        // Then
         assertNotNull(result);
         assertEquals(12, result.getTotalCount());
         assertEquals(2, result.getColleagueCounts().size());
@@ -151,22 +146,96 @@ class EmailBuilderServiceTest {
     }
 
     @Test
+    void buildHtml_shouldGenerateValidHtml() {
+        EmailContentJson emailContent = new EmailContentJson();
+        emailContent.setRecipient("stephan@usergems.com");
+        emailContent.setDate(java.time.LocalDate.now());
+        emailContent.setMeetings(new ArrayList<>());
+
+        String html = emailBuilderService.buildHtml(emailContent);
+
+        assertNotNull(html);
+        assertTrue(html.contains("<!DOCTYPE html>"));
+        assertTrue(html.contains("USERGEMS"));
+        assertTrue(html.contains("Your Morning Update"));
+    }
+
+    @Test
     void buildJson_shouldHandleEventWithoutEnrichedPerson() {
-        // Given
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(personRepository.findById("demi@algolia.com")).thenReturn(Optional.empty());
         when(eventRepository.countMeetingsBetween(anyString(), anyString())).thenReturn(0);
         when(eventRepository.findColleagueMeetingCounts(anyString(), anyString())).thenReturn(Collections.emptyList());
 
-        // When
         EmailContentJson result = emailBuilderService.buildJson(1L, Collections.singletonList(testEvent));
 
-        // Then
         assertNotNull(result);
         assertEquals(1, result.getMeetings().size());
         var attendee = result.getMeetings().get(0).getExternalAttendees().get(0);
         assertEquals("demi@algolia.com", attendee.getEmail());
         assertNull(attendee.getName());
         assertNull(attendee.getTitle());
+    }
+
+    @Test
+    void buildJson_shouldShowDeclinedAttendeesWithoutEnrichment() {
+        PersonEntity acceptedPerson = new PersonEntity();
+        acceptedPerson.setEmail("accepted@algolia.com");
+        acceptedPerson.setFirstName("John");
+        acceptedPerson.setLastName("Accepted");
+        acceptedPerson.setTitle("CEO");
+
+        EventAttendeeEntity organizer = new EventAttendeeEntity();
+        organizer.setEmail("stephan@usergems.com");
+        organizer.setStatus("accepted");
+
+        EventAttendeeEntity acceptedExternal = new EventAttendeeEntity();
+        acceptedExternal.setEmail("accepted@algolia.com");
+        acceptedExternal.setStatus("accepted");
+
+        EventAttendeeEntity declinedExternal = new EventAttendeeEntity();
+        declinedExternal.setEmail("declined@algolia.com");
+        declinedExternal.setStatus("declined");
+
+        EventAttendeeEntity declinedInternal = new EventAttendeeEntity();
+        declinedInternal.setEmail("declined@usergems.com");
+        declinedInternal.setStatus("declined");
+
+        testEvent.setAttendees(Arrays.asList(organizer, acceptedExternal, declinedExternal, declinedInternal));
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(personRepository.findById("accepted@algolia.com")).thenReturn(Optional.of(acceptedPerson));
+        when(eventRepository.countMeetingsBetween("stephan@usergems.com", "accepted@algolia.com")).thenReturn(5);
+        when(eventRepository.findColleagueMeetingCounts("stephan@usergems.com", "accepted@algolia.com"))
+                .thenReturn(Collections.emptyList());
+
+        EmailContentJson result = emailBuilderService.buildJson(1L, Collections.singletonList(testEvent));
+
+        assertNotNull(result);
+        assertEquals(1, result.getMeetings().size());
+        var meeting = result.getMeetings().get(0);
+        
+        assertEquals(1, meeting.getInternalAttendees().size());
+        assertTrue(meeting.getInternalAttendees().contains("declined@usergems.com"));
+        
+        assertEquals(2, meeting.getExternalAttendees().size());
+        
+        var acceptedAttendee = meeting.getExternalAttendees().stream()
+                .filter(a -> a.getEmail().equals("accepted@algolia.com"))
+                .findFirst().orElse(null);
+        assertNotNull(acceptedAttendee);
+        assertEquals("John Accepted", acceptedAttendee.getName());
+        assertEquals("CEO", acceptedAttendee.getTitle());
+        assertEquals(5, acceptedAttendee.getMeetingCount());
+        
+        var declinedAttendee = meeting.getExternalAttendees().stream()
+                .filter(a -> a.getEmail().equals("declined@algolia.com"))
+                .findFirst().orElse(null);
+        assertNotNull(declinedAttendee);
+        assertEquals("declined@algolia.com", declinedAttendee.getEmail());
+        assertEquals("declined", declinedAttendee.getStatus());
+        assertNull(declinedAttendee.getName());
+        assertNull(declinedAttendee.getTitle());
+        assertNull(declinedAttendee.getMeetingCount());
     }
 }

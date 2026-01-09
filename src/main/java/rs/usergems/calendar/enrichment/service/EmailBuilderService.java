@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -80,11 +81,12 @@ public class EmailBuilderService {
             Integer companyEmployees = null;
 
             for (EventAttendeeEntity attendee : externalAttendees) {
-                PersonEntity person = personRepository.findById(attendee.getEmail()).orElse(null);
-
                 AttendeeDto dto = new AttendeeDto();
                 dto.setEmail(attendee.getEmail());
                 dto.setStatus(attendee.getStatus());
+
+                // For all attendees, get existing data from DB
+                PersonEntity person = personRepository.findById(attendee.getEmail()).orElse(null);
 
                 if (person != null) {
                     dto.setName(buildFullName(person.getFirstName(), person.getLastName()));
@@ -114,6 +116,125 @@ public class EmailBuilderService {
         }
 
         return new EmailContentJson(user.getEmail(), LocalDate.now(), meetings);
+    }
+
+    /**
+     * Renders HTML from email JSON content (bonus feature)
+     *
+     * @param emailJson structured email content
+     * @return HTML string
+     */
+    public String buildHtml(EmailContentJson emailJson) {
+        StringBuilder html = new StringBuilder();
+
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html>\n<head>\n");
+        html.append("<style>\n");
+        html.append("body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }\n");
+        html.append(".container { max-width: 800px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 8px; }\n");
+        html.append(".header { text-align: center; margin-bottom: 30px; }\n");
+        html.append(".logo { color: #00D4AA; font-size: 24px; font-weight: bold; }\n");
+        html.append(".subtitle { color: #00D4AA; font-size: 18px; margin-top: 10px; }\n");
+        html.append(".meeting { border-left: 4px solid #00D4AA; padding-left: 20px; margin-bottom: 30px; }\n");
+        html.append(".meeting-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }\n");
+        html.append(".meeting-time { color: #00D4AA; margin-bottom: 10px; }\n");
+        html.append(".attendee { display: flex; align-items: center; margin-bottom: 15px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; }\n");
+        html.append(".attendee-avatar { width: 50px; height: 50px; border-radius: 50%; margin-right: 15px; }\n");
+        html.append(".attendee-info { flex: 1; }\n");
+        html.append(".attendee-name { font-weight: bold; color: #00D4AA; }\n");
+        html.append(".attendee-title { color: #666; font-size: 14px; }\n");
+        html.append(".attendee-meta { color: #999; font-size: 12px; margin-top: 5px; }\n");
+        html.append(".company { background-color: #f0f0f0; padding: 10px; border-radius: 5px; margin-top: 10px; }\n");
+        html.append("</style>\n");
+        html.append("</head>\n<body>\n");
+        html.append("<div class='container'>\n");
+
+        html.append("<div class='header'>\n");
+        html.append("<div class='logo'>◆ USERGEMS</div>\n");
+        html.append("<div class='subtitle'>Your Morning Update</div>\n");
+        html.append("</div>\n");
+
+        for (MeetingDto meeting : emailJson.getMeetings()) {
+            html.append("<div class='meeting'>\n");
+            html.append("<div class='meeting-title'>").append(escapeHtml(meeting.getTitle())).append("</div>\n");
+            html.append("<div class='meeting-time'>")
+                    .append(meeting.getStart()).append(" - ").append(meeting.getEnd())
+                    .append(" | ").append(meeting.getDurationMin()).append(" min</div>\n");
+
+            if (meeting.getInternalAttendees() != null && !meeting.getInternalAttendees().isEmpty()) {
+                html.append("<div style='margin: 10px 0; color: #666;'>Joining from UserGems: ")
+                        .append(String.join(", ", meeting.getInternalAttendees().stream()
+                                .map(email -> email.split("@")[0])
+                                .collect(Collectors.toList())))
+                        .append("</div>\n");
+            }
+
+            if (meeting.getExternalAttendees() != null) {
+                for (AttendeeDto attendee : meeting.getExternalAttendees()) {
+                    html.append("<div class='attendee'>\n");
+
+                    if (attendee.getAvatar() != null) {
+                        html.append("<img class='attendee-avatar' src='")
+                                .append(escapeHtml(attendee.getAvatar())).append("' alt='Avatar'>\n");
+                    } else {
+                        html.append("<div class='attendee-avatar' style='background-color: #ddd;'></div>\n");
+                    }
+
+                    html.append("<div class='attendee-info'>\n");
+
+                    if (attendee.getName() != null) {
+                        html.append("<div class='attendee-name'>").append(escapeHtml(attendee.getName()));
+                        if (attendee.getLinkedin() != null) {
+                            html.append(" <a href='").append(escapeHtml(attendee.getLinkedin())).append("'>in</a>");
+                        }
+                        html.append("</div>\n");
+                    } else {
+                        html.append("<div class='attendee-name'>").append(escapeHtml(attendee.getEmail())).append("</div>\n");
+                    }
+
+                    if (attendee.getTitle() != null) {
+                        html.append("<div class='attendee-title'>").append(escapeHtml(attendee.getTitle())).append("</div>\n");
+                    }
+
+                    if (attendee.getMeetingCount() != null && attendee.getMeetingCount() > 0) {
+                        html.append("<div class='attendee-meta'>");
+                        html.append(getOrdinal(attendee.getMeetingCount())).append(" Meeting");
+
+                        if (attendee.getMetWithColleagues() != null && !attendee.getMetWithColleagues().isEmpty()) {
+                            html.append(" | Met with ");
+                            List<String> colleagues = attendee.getMetWithColleagues().entrySet().stream()
+                                    .map(e -> e.getKey().split("@")[0] + " (" + e.getValue() + "x)")
+                                    .collect(Collectors.toList());
+                            html.append(String.join(", ", colleagues));
+                        }
+
+                        html.append("</div>\n");
+                    }
+
+                    html.append("</div>\n");
+                    html.append("</div>\n");
+                }
+            }
+
+            if (meeting.getCompany() != null && meeting.getCompany().getName() != null) {
+                html.append("<div class='company'>\n");
+                html.append("<strong>").append(escapeHtml(meeting.getCompany().getName())).append("</strong>");
+                if (meeting.getCompany().getEmployees() != null) {
+                    html.append(" | ").append(meeting.getCompany().getEmployees()).append(" employees");
+                }
+                if (meeting.getCompany().getLinkedinUrl() != null) {
+                    html.append(" | <a href='").append(escapeHtml(meeting.getCompany().getLinkedinUrl())).append("'>LinkedIn</a>");
+                }
+                html.append("\n</div>\n");
+            }
+
+            html.append("</div>\n");
+        }
+
+        html.append("</div>\n");
+        html.append("</body>\n</html>");
+
+        return html.toString();
     }
 
     /**
@@ -166,5 +287,28 @@ public class EmailBuilderService {
         company.setLinkedinUrl(linkedinUrl);
         company.setEmployees(employees);
         return company;
+    }
+
+    private String escapeHtml(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
+    }
+
+    private String getOrdinal(int number) {
+        if (number % 100 >= 11 && number % 100 <= 13) {
+            return number + "th";
+        }
+        return switch (number % 10) {
+            case 1 -> number + "st";
+            case 2 -> number + "nd";
+            case 3 -> number + "rd";
+            default -> number + "th";
+        };
     }
 }
