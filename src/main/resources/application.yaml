@@ -49,9 +49,21 @@ management:
     readinessState:
       enabled: true
 
+calendar:
+  api:
+    base-url: ${CALENDAR_API_BASE_URL:https://app.usergems.com/api/hiring/calendar-challenge}
+    api-keys:
+      stephan@usergems.com: ${API_KEY_STEPHAN:7SS16U^PmxkdVJlb^}
+      kieran@usergems.com: ${API_KEY_KIERAN:vJy8I3nwriNW*I4w^}
+      jas@usergems.com: ${API_KEY_JAS:tK7U8PVeGi3pP9tB^}
+      josh@algolia.com: ${API_KEY_JOSH:b8R*41QR21N5wuww^}
+    feign:
+      logger-level: ${FEIGN_LOGGER_LEVEL:FULL}
+
 logging:
   level:
     root: INFO
     rs.usergems: DEBUG
+    rs.usergems.calendar.enrichment.client.rs.usergems.calendar.enrichment.client.calendar.CalendarFeignClient: DEBUG
   pattern:
     console: '%black(%d{ISO8601}) %highlight(%-5level) [%blue(%t)] %yellow(%C{1}): %msg%n%throwable'
