@@ -62,6 +62,24 @@ class PersonEnrichmentServiceTest {
     }
 
     @Test
+    void enrichPerson_EmptyEmail_ReturnsNull() {
+        PersonEntity result = personEnrichmentService.enrichPerson("");
+
+        assertNull(result);
+        verify(personRepository, never()).findById(anyString());
+        verify(personFeignClient, never()).getPersonByEmail(anyString(), anyString());
+    }
+
+    @Test
+    void enrichPerson_InternalUser_ReturnsNull() {
+        PersonEntity result = personEnrichmentService.enrichPerson(INTERNAL_EMAIL);
+
+        assertNull(result);
+        verify(personRepository, never()).findById(anyString());
+        verify(personFeignClient, never()).getPersonByEmail(anyString(), anyString());
+    }
+
+    @Test
     void enrichPerson_FreshCacheHit_ReturnsCachedData() {
         PersonEntity cachedPerson = createCachedPerson(EXTERNAL_EMAIL, LocalDateTime.now().minusDays(10));
         when(personRepository.findById(EXTERNAL_EMAIL)).thenReturn(Optional.of(cachedPerson));
@@ -73,6 +91,92 @@ class PersonEnrichmentServiceTest {
         verify(personRepository, times(1)).findById(EXTERNAL_EMAIL);
         verify(personFeignClient, never()).getPersonByEmail(anyString(), anyString());
         verify(personRepository, never()).save(any());
+    }
+
+    @Test
+    void enrichPerson_StaleCacheHit_RefreshesFromApi() {
+        PersonEntity stalePerson = createCachedPerson(EXTERNAL_EMAIL, LocalDateTime.now().minusDays(35));
+        PersonDto apiResponse = createPersonDto();
+        PersonEntity savedPerson = createCachedPerson(EXTERNAL_EMAIL, LocalDateTime.now());
+
+        when(personRepository.findById(EXTERNAL_EMAIL)).thenReturn(Optional.of(stalePerson));
+        when(personFeignClient.getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL)).thenReturn(apiResponse);
+        when(personRepository.save(any(PersonEntity.class))).thenReturn(savedPerson);
+
+        PersonEntity result = personEnrichmentService.enrichPerson(EXTERNAL_EMAIL);
+
+        assertNotNull(result);
+        assertEquals(EXTERNAL_EMAIL, result.getEmail());
+        verify(personRepository, times(1)).findById(EXTERNAL_EMAIL);
+        verify(personFeignClient, times(1)).getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL);
+        verify(personRepository, times(1)).save(any(PersonEntity.class));
+    }
+
+    @Test
+    void enrichPerson_CacheMiss_FetchesFromApi() {
+        PersonDto apiResponse = createPersonDto();
+        PersonEntity savedPerson = createCachedPerson(EXTERNAL_EMAIL, LocalDateTime.now());
+
+        when(personRepository.findById(EXTERNAL_EMAIL)).thenReturn(Optional.empty());
+        when(personFeignClient.getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL)).thenReturn(apiResponse);
+        when(personRepository.save(any(PersonEntity.class))).thenReturn(savedPerson);
+
+        PersonEntity result = personEnrichmentService.enrichPerson(EXTERNAL_EMAIL);
+
+        assertNotNull(result);
+        assertEquals(EXTERNAL_EMAIL, result.getEmail());
+        verify(personRepository, times(1)).findById(EXTERNAL_EMAIL);
+        verify(personFeignClient, times(1)).getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL);
+        verify(personRepository, times(1)).save(any(PersonEntity.class));
+    }
+
+    @Test
+    void enrichPerson_ApiFailsWithStaleCache_ReturnsStaleCache() {
+        PersonEntity stalePerson = createCachedPerson(EXTERNAL_EMAIL, LocalDateTime.now().minusDays(35));
+
+        when(personRepository.findById(EXTERNAL_EMAIL)).thenReturn(Optional.of(stalePerson));
+        when(personFeignClient.getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL))
+                .thenThrow(new RuntimeException("API error"));
+
+        PersonEntity result = personEnrichmentService.enrichPerson(EXTERNAL_EMAIL);
+
+        assertNotNull(result);
+        assertEquals(EXTERNAL_EMAIL, result.getEmail());
+        assertEquals(stalePerson, result);
+        verify(personRepository, times(1)).findById(EXTERNAL_EMAIL);
+        verify(personFeignClient, times(1)).getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL);
+        verify(personRepository, never()).save(any());
+    }
+
+    @Test
+    void enrichPerson_ApiFailsWithoutCache_ReturnsNull() {
+        when(personRepository.findById(EXTERNAL_EMAIL)).thenReturn(Optional.empty());
+        when(personFeignClient.getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL))
+                .thenThrow(new RuntimeException("API error"));
+
+        PersonEntity result = personEnrichmentService.enrichPerson(EXTERNAL_EMAIL);
+
+        assertNull(result);
+        verify(personRepository, times(1)).findById(EXTERNAL_EMAIL);
+        verify(personFeignClient, times(1)).getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL);
+        verify(personRepository, never()).save(any());
+    }
+
+    @Test
+    void enrichPerson_CacheWithNullFetchedAt_RefreshesFromApi() {
+        PersonEntity cachedPerson = createCachedPerson(EXTERNAL_EMAIL, null);
+        PersonDto apiResponse = createPersonDto();
+        PersonEntity savedPerson = createCachedPerson(EXTERNAL_EMAIL, LocalDateTime.now());
+
+        when(personRepository.findById(EXTERNAL_EMAIL)).thenReturn(Optional.of(cachedPerson));
+        when(personFeignClient.getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL)).thenReturn(apiResponse);
+        when(personRepository.save(any(PersonEntity.class))).thenReturn(savedPerson);
+
+        PersonEntity result = personEnrichmentService.enrichPerson(EXTERNAL_EMAIL);
+
+        assertNotNull(result);
+        verify(personFeignClient, times(1)).getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL);
+        verify(personRepository, times(1)).save(any(PersonEntity.class));
     }
 
     @Test
@@ -90,6 +194,46 @@ class PersonEnrichmentServiceTest {
         assertNotNull(result);
         verify(personFeignClient, times(1)).getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL);
         verify(personRepository, times(1)).save(any(PersonEntity.class));
+    }
+
+    @Test
+    void enrichPerson_MapsAllFieldsCorrectly() {
+        PersonDto apiResponse = createPersonDto();
+        when(personRepository.findById(EXTERNAL_EMAIL)).thenReturn(Optional.empty());
+        when(personFeignClient.getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL)).thenReturn(apiResponse);
+        when(personRepository.save(any(PersonEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PersonEntity result = personEnrichmentService.enrichPerson(EXTERNAL_EMAIL);
+
+        assertNotNull(result);
+        assertEquals(EXTERNAL_EMAIL, result.getEmail());
+        assertEquals("John", result.getFirstName());
+        assertEquals("Doe", result.getLastName());
+        assertEquals("https://example.com/avatar.jpg", result.getAvatarUrl());
+        assertEquals("Software Engineer", result.getTitle());
+        assertEquals("https://linkedin.com/in/johndoe", result.getLinkedinUrl());
+        assertEquals("Acme Corp", result.getCompanyName());
+        assertEquals("https://linkedin.com/company/acme", result.getCompanyLinkedin());
+        assertEquals(500, result.getCompanyEmployees());
+        assertNotNull(result.getFetchedAt());
+    }
+
+    @Test
+    void enrichPerson_ApiResponseWithNullCompany_MapsCorrectly() {
+        PersonDto apiResponse = createPersonDto();
+        apiResponse.setCompany(null);
+
+        when(personRepository.findById(EXTERNAL_EMAIL)).thenReturn(Optional.empty());
+        when(personFeignClient.getPersonByEmail(BEARER_TOKEN, EXTERNAL_EMAIL)).thenReturn(apiResponse);
+        when(personRepository.save(any(PersonEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PersonEntity result = personEnrichmentService.enrichPerson(EXTERNAL_EMAIL);
+
+        assertNotNull(result);
+        assertEquals(EXTERNAL_EMAIL, result.getEmail());
+        assertNull(result.getCompanyName());
+        assertNull(result.getCompanyLinkedin());
+        assertNull(result.getCompanyEmployees());
     }
 
     @Test

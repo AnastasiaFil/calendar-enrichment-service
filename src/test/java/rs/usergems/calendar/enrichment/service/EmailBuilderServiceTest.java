@@ -185,6 +185,13 @@ class EmailBuilderServiceTest {
         acceptedPerson.setLastName("Accepted");
         acceptedPerson.setTitle("CEO");
 
+        PersonEntity declinedPerson = new PersonEntity();
+        declinedPerson.setEmail("declined@algolia.com");
+        declinedPerson.setFirstName("Jane");
+        declinedPerson.setLastName("Declined");
+        declinedPerson.setTitle("CTO");
+        declinedPerson.setLinkedinUrl("https://linkedin.com/in/jane-declined");
+
         EventAttendeeEntity organizer = new EventAttendeeEntity();
         organizer.setEmail("stephan@usergems.com");
         organizer.setStatus("accepted");
@@ -205,8 +212,12 @@ class EmailBuilderServiceTest {
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(personRepository.findById("accepted@algolia.com")).thenReturn(Optional.of(acceptedPerson));
+        when(personRepository.findById("declined@algolia.com")).thenReturn(Optional.of(declinedPerson));
         when(eventRepository.countMeetingsBetween("stephan@usergems.com", "accepted@algolia.com")).thenReturn(5);
         when(eventRepository.findColleagueMeetingCounts("stephan@usergems.com", "accepted@algolia.com"))
+                .thenReturn(Collections.emptyList());
+        when(eventRepository.countMeetingsBetween("stephan@usergems.com", "declined@algolia.com")).thenReturn(3);
+        when(eventRepository.findColleagueMeetingCounts("stephan@usergems.com", "declined@algolia.com"))
                 .thenReturn(Collections.emptyList());
 
         EmailContentJson result = emailBuilderService.buildJson(1L, Collections.singletonList(testEvent));
@@ -214,12 +225,12 @@ class EmailBuilderServiceTest {
         assertNotNull(result);
         assertEquals(1, result.getMeetings().size());
         var meeting = result.getMeetings().get(0);
-        
+
         assertEquals(1, meeting.getInternalAttendees().size());
         assertTrue(meeting.getInternalAttendees().contains("declined@usergems.com"));
-        
+
         assertEquals(2, meeting.getExternalAttendees().size());
-        
+
         var acceptedAttendee = meeting.getExternalAttendees().stream()
                 .filter(a -> a.getEmail().equals("accepted@algolia.com"))
                 .findFirst().orElse(null);
@@ -227,15 +238,17 @@ class EmailBuilderServiceTest {
         assertEquals("John Accepted", acceptedAttendee.getName());
         assertEquals("CEO", acceptedAttendee.getTitle());
         assertEquals(5, acceptedAttendee.getMeetingCount());
-        
+
         var declinedAttendee = meeting.getExternalAttendees().stream()
                 .filter(a -> a.getEmail().equals("declined@algolia.com"))
                 .findFirst().orElse(null);
         assertNotNull(declinedAttendee);
         assertEquals("declined@algolia.com", declinedAttendee.getEmail());
         assertEquals("declined", declinedAttendee.getStatus());
-        assertNull(declinedAttendee.getName());
-        assertNull(declinedAttendee.getTitle());
-        assertNull(declinedAttendee.getMeetingCount());
+
+        assertEquals("Jane Declined", declinedAttendee.getName());
+        assertEquals("CTO", declinedAttendee.getTitle());
+        assertEquals("https://linkedin.com/in/jane-declined", declinedAttendee.getLinkedin());
+        assertEquals(3, declinedAttendee.getMeetingCount());
     }
 }
