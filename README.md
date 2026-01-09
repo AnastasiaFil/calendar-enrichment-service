@@ -98,7 +98,7 @@ graph TB
         end
         
         subgraph "Orchestration Layer"
-            MorningEmail[MorningEmailService<br/>@Scheduled 8:00 AM<br/>Orchestrator]
+            MorningEmail["MorningEmailService<br/>@Scheduled 8:00 AM<br/>Orchestrator"]
         end
         
         subgraph "Business Layer"
