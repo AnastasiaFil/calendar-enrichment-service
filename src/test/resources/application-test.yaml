@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: calendar-enrichment-service-test
+  datasource:
+    url: jdbc:tc:postgresql:15:///testdb
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    show-sql: false
+    generate-ddl: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        default_schema: calendar_enrichment
+  liquibase:
+    enabled: false
+
+calendar:
+  api:
+    base-url: http://localhost:8080
+    api-keys:
+      test@usergems.com: test-api-key
+      another@usergems.com: another-test-key
+    feign:
+      logger-level: BASIC
+
+logging:
+  level:
+    root: INFO
+    rs.usergems: DEBUG
